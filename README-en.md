@@ -22,53 +22,53 @@
 > <details>
 > <summary><strong>Click to view the Android version codes (subject to future updates)</strong></summary>
 >
->`_z Android19 (Zebra Cake)`
+>>`_z Android19 (Zebra Cake)`
 >
->`_y Android18 (Yogurt Parfait)`
+>>`_y Android18 (Yogurt Parfait)`
 >
->`_x Android17 (Xmas Pudding)`
+>>`_x Android17 (Xmas Pudding)`
 >
->`_w Android16 (Wedding Cake)`<strong>
+>>`_w Android16 (Wedding Cake)`<strong>
 >
->`_v Android15 (Vanilla Ice Cream)`
+>>`_v Android15 (Vanilla Ice Cream)`
 >
->`_u Android14 (Upside Down Cake)`
+>>`_u Android14 (Upside Down Cake)`
 >
->`_t Android13 (Tiramisu)`
+>>`_t Android13 (Tiramisu)`
 >
->`_s Android12 (Snow Cone)`</strong>
+>>`_s Android12 (Snow Cone)`</strong>
 >
->`_r Android11 (Red Velvet Cake)`
+>>`_r Android11 (Red Velvet Cake)`
 >
->`_q Android10 (Quince Tart)`
+>>`_q Android10 (Quince Tart)`
 >
->`_p Android9 (Pie)`
+>>`_p Android9 (Pie)`
 >
->`_o Android8 (Oreo)`
+>>`_o Android8 (Oreo)`
 >
->`_n Android7 (Nougat)`
+>>`_n Android7 (Nougat)`
 >
->`_m Android6 (Marshmallow)`
+>>`_m Android6 (Marshmallow)`
 >
->`_l Android5 (Lollipop)`
+>>`_l Android5 (Lollipop)`
 >
->`_k Android4.4 (KitKat)`
+>>`_k Android4.4 (KitKat)`
 >
->`_j Android4.3–4.1 (Jelly Bean)`
+>>`_j Android4.3–4.1 (Jelly Bean)`
 >
->`_i Android4.0 (Ice Cream Sandwich)`
+>>`_i Android4.0 (Ice Cream Sandwich)`
 >
->`_h Android3.x (Honeycomb)`
+>>`_h Android3.x (Honeycomb)`
 >
->`_g Android2.3 (Gingerbread)`
+>>`_g Android2.3 (Gingerbread)`
 >
->`_f Android2.2 (FroYo)`
+>>`_f Android2.2 (FroYo)`
 >
->`_e Android2.1 (Eclair)`
+>>`_e Android2.1 (Eclair)`
 >
->`_d Android1.6 (Donut)`
+>>`_d Android1.6 (Donut)`
 >
->`_c Android1.5 (Cupcake)`
+>>`_c Android1.5 (Cupcake)`
 >
 > </details>
 
@@ -80,7 +80,7 @@
 >
 >|Device Type                | Average Duration Range            | Maximum Duration     |
 >|-------------------------------------|--------------------------|------------------|
->| `All other models`                  | `19min ~ 33min`         | `35min`         |
+>| `All other models`                  | `19min ~ 29min`         | `35min`         |
 >| `Special models e.g.: OnePlus 11-A14; OnePlus 11-A13`    | `55min ~ 1h17min`     | `1h23min` |
 > </details>
 > 
@@ -108,12 +108,9 @@
 > `dtbo.img`, `system_dlkm.erofs.img`, `vendor_dlkm.img`, and `vendor_boot.img`,
 > **otherwise the device may fail to boot!**
 >
-> If you have enabled the **`ZRAM`** algorithm, make sure to install the `ZRAM` module
-> **before rebooting** after flashing with `Anykernel3`. You may need to adjust some parameters manually.
-> Note: The **5.10 kernel does NOT support `ZRAM`**, as the `zram.ko` module path could not be found.
+> If you have enabled the `ZRAM` algorithm, make sure to install the `ZRAM` module
+> **before rebooting** after flashing with `Anykernel3`. You may need to adjust some parameters manually.The 5.10 kernel is not supported `ZRAM` , as the `zram.ko` module path could not be found.
 >
-> **We have noticed that some `sm8650` devices fail to boot after updating to builds `830/831` due to a kernel minor version change — this is because the upstream has upgraded from `6.1.75` to `6.1.118`. Please wait for the upstream source code to be updated (expected around `July 4`).Additionally, `5.15` may also receive an update in the next version, potentially jumping from `5.15.149` to `5.15.170`. Please stay alert.**
-
  
 ------
  
