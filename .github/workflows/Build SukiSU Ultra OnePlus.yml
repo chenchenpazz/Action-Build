@@ -245,7 +245,7 @@ jobs:
           git add -A
           git commit -m "Fix: inject random kernel suffix & remove -dirty"
 
-      - name: Download Kernel-manifest
+      - name: Download kernel-manifest
         id: fetch_manifest
         run: |
           feil="${{ github.event.inputs.FEIL }}"
@@ -261,7 +261,7 @@ jobs:
           cd kernel_workspace/kernel_platform
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           cd ./KernelSU
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10606)
+          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10700)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           export KSU_VERSION=$KSU_VERSION
           sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
@@ -283,7 +283,6 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
           cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
           cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
-          echo "zram_patch完成"
           fi
 
           cd ./common
@@ -412,9 +411,10 @@ jobs:
             echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$CONFIG_FILE"
             echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
           fi
-          # Remove check_defconfig
+          # 移除构建校验
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
+      # 风驰内核，以 sm8750 为主体，其他 CPU 可能无效或者无法跑出
       - name: Add sched_ext
         if: ${{ github.event.inputs.SCHED == 'true' }}
         run: |
@@ -482,80 +482,62 @@ jobs:
         if: ${{ github.event.inputs.FAST_BUILD == 'false' || steps.fast_build.outputs.fallback == 'true' }}
         run: |
           cd kernel_workspace
-          if [[ -f ./kernel_platform/build_with_bazel.py ]]; then
+          if [ -f ./kernel_platform/build_with_bazel.py ] && [ "${{ needs.get-config.outputs.KERNEL_VERSION }}" != "6.6" ]; then
             ./kernel_platform/build_with_bazel.py -t ${{ needs.get-config.outputs.CPUD }} ${{ github.event.inputs.BUILD_METHOD }}
           else
             LTO=thin SYSTEM_DLKM_RE_SIGN=0 BUILD_SYSTEM_DLKM=0 KMI_SYMBOL_LIST_STRICT_MODE=0 \
             ./kernel_platform/oplus/build/oplus_build_kernel.sh ${{ needs.get-config.outputs.CPUD }} ${{ github.event.inputs.BUILD_METHOD }}
           fi
-      
 
       - name: Make AnyKernel3
         run: |
           git clone https://github.com/Numbersf/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
-
-          dir1="kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/dist/"
-          dir2="kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/${{ needs.get-config.outputs.CPUD }}_gki_kbuild_mixed_tree/"
-          dir3="kernel_workspace/kernel_platform/out/msm-${{ needs.get-config.outputs.CPUD }}-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/dist/"
-          dir4="kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/gki_kernel/common/arch/arm64/boot/"
-          dir5="kernel_workspace/kernel_platform/out/msm-${{ needs.get-config.outputs.CPUD }}-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/gki_kernel/common/arch/arm64/boot/"
-          target1="./AnyKernel3/"
-          target2="./kernel_workspace/kernel"
-
-          # 查找 Image 文件
-          if find "$dir1" -name "Image" | grep -q "Image"; then
-            image_path="$dir1"Image
-          elif find "$dir2" -name "Image" | grep -q "Image"; then
-            image_path="$dir2"Image
-          elif find "$dir3" -name "Image" | grep -q "Image"; then
-            image_path="$dir3"Image
-          elif find "$dir4" -name "Image" | grep -q "Image"; then
-            image_path="$dir4"Image
-          elif find "$dir5" -name "Image" | grep -q "Image"; then
-            image_path="$dir5"Image
+          mkdir -p kernel_workspace/kernel_platform/out/FinalImageFind/
+          dir1=""
+          dir2=""
+          image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
+          if [ -n "$image_path" ]; then
+            dir1=$(dirname "$image_path")/
+            echo "使用 make 编译的统一路径，成功找到 Image 文件"
           else
-            image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
-             if [ -n "$image_path" ]; then
-               echo "使用 make 编译的统一路径，无需复制"
-             fi
+            image_path=$(find "./kernel_workspace/kernel_platform/out/" -name "Image" | head -n 1)
+            if [ -n "$image_path" ]; then
+              dir2=$(dirname "$image_path")/
+              echo "使用官方脚本编译，成功找到 Image 文件"
+            else
+              echo "未找到 Image 文件，构建失败" >&2
+              exit 1
+            fi
           fi
 
-          # 复制 Image 到同一个路径方便直接调用
+          # 复制 Image 到 AnyKernel3
           if [ -n "$image_path" ] && [ -f "$image_path" ]; then
             echo "Image file finally located at: $image_path"
-            mkdir -p "$dir1"
-            if [ "$(realpath "$image_path")" != "$(realpath "$dir1"Image)" ]; then
-              cp "$image_path" "$dir1"
-            else
-              echo "源文件路径与目标路径相同，跳过复制"
-            fi
-            cp "$dir1"Image ./AnyKernel3/Image
-          else
-            echo "未找到 Image 文件，无法复制，构建可能失败"
-            exit 1
+            cp "$image_path" ./AnyKernel3/Image
+            cp "$image_path" kernel_workspace/kernel_platform/out/FinalImageFind/Image
           fi
 
-          # 复制其它可能需要的文件（如果存在），部分 img 并不会直接安装，仅复制到 zip 供参考使用
-          if [ "${{ needs.get-config.outputs.CPU }}" = "sm8750" ] && [ "${{ github.event.inputs.FAST_BUILD }}" = "false" ]; then
-          for file in dtbo.img system_dlkm.erofs.img vendor_dlkm.img vendor_boot.img; do
-            if [ -f "$dir1$file" ]; then
-              target_name="$file"
-              # 特殊处理 system_dlkm.erofs.img 的目标名
-              if [ "$file" = "system_dlkm.erofs.img" ]; then
-                target_name="system_dlkm.img"
+          # 使用官方脚本的 sm8750，选择性复制其它镜像文件
+          if [ -n "$dir2" ] && [ "${{ needs.get-config.outputs.CPU }}" = "sm8750" ] && [ "${{ github.event.inputs.FAST_BUILD }}" = "false" ]; then
+            for file in dtbo.img system_dlkm.erofs.img vendor_dlkm.img vendor_boot.img; do
+              if [ -f "$dir2$file" ]; then
+                target_name="$file"
+                # 特殊处理 system_dlkm.erofs.img 的目标名
+                if [ "$file" = "system_dlkm.erofs.img" ]; then
+                  target_name="system_dlkm.img"
+                fi
+                cp "$dir2$file" "./AnyKernel3/$target_name"
+              else
+                echo "$file 不存在，跳过复制"
               fi
-              cp "$dir1$file" "./AnyKernel3/$target_name"
-            else
-              echo "$file 不存在，跳过复制"
-            fi
-          done
+            done
           fi
 
       - name: Apply patch_linux and replace Image
         if: ${{ github.event.inputs.KPM == 'true' }}
         run: |
-          cd kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/dist
+          cd kernel_workspace/kernel_platform/out/FinalImageFind
           curl -LO --retry 5 --retry-delay 2 --retry-connrefused https://raw.githubusercontent.com/Numbersf/Action-Build/SukiSU-Ultra/patches/patch_linux
           chmod +x patch_linux
           ./patch_linux
@@ -633,7 +615,7 @@ jobs:
           cpu="${{ needs.get-config.outputs.CPU }}"
           xml=".repo/manifests_fallback_Numbersf/${feil}.xml"
           cd $GITHUB_WORKSPACE
-          # 去掉末尾的 _x（只删一次）
+          # 去掉末尾的 _x（只删一个）
           feil_base=$(echo "$feil" | sed -E 's/_[a-z]$//')
 
           # 提取 revision 并解析 Android 版本
@@ -652,7 +634,6 @@ jobs:
 
           echo "value=$clean_feil" >> "$GITHUB_OUTPUT"
 
-
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
@@ -667,24 +648,29 @@ jobs:
           curl -s https://api.github.com/repos/FurLC/ZRAM-Module/releases/latest | \
             grep "browser_download_url" | grep "ZRAM-Module-.*\.zip" | cut -d '"' -f 4 | xargs wget -N
           unzip "$(ls -t ZRAM-Module-*.zip | head -1)" -d ZRAM-Module
-          zram1="./kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/dist/"
-          zram2="./kernel_workspace/kernel_platform/out/msm-${{ needs.get-config.outputs.CPUD }}-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/dist/"
-          zram3="./kernel_workspace/kernel_platform/out/dist/"
-          zram4="./kernel_workspace/kernel_platform/out/vendor/oplus/kernel/mm/"
-          zram5="./kernel_workspace/device/qcom/${{ needs.get-config.outputs.CPUD }}-kernel/vendor_dlkm/"
-          zram6="./kernel_workspace/device/qcom/${{ needs.get-config.outputs.CPUD }}-kernel/system_dlkm/flatten/lib/modules/"
-          zram7="./kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/msm-kernel/mm/oplus_mm/hybridswap_zram/"
-          zram8="./kernel_workspace/kernel_platform/out/msm-kernel-${{ needs.get-config.outputs.CPUD }}-${{ github.event.inputs.BUILD_METHOD }}/msm-kernel/mm/oplus_bsp_hybridswap_zram/"
+
           target="./ZRAM-Module/zram/zram.ko"
-          for dir in "$zram1" "$zram2" "$zram3" "$zram4" "$zram5" "$zram6" "$zram7" "$zram8"; do
-            zram_path=$(find "$dir" -name "zram.ko" | head -n 1)
+          echo "查找 zram.ko 模块文件..."
+
+          # 优先查找常见目录
+          search_paths=(
+            "./kernel_workspace/kernel_platform/out"
+            "./kernel_workspace/device/qcom"
+          )
+
+          zram_path=""
+          for path in "${search_paths[@]}"; do
+            zram_path=$(find "$path" -type f -name "zram.ko" | head -n 1)
             [ -n "$zram_path" ] && break
           done
+
+          # 若以上未找到，广泛查找整个 workspace
           if [ -z "$zram_path" ]; then
-            zram_path=$(find "./kernel_workspace" -name "zram.ko" | head -n 1)
+            zram_path=$(find "./kernel_workspace" -type f -name "zram.ko" | head -n 1)
           fi
+
           if [ -n "$zram_path" ] && [ -f "$zram_path" ]; then
-            echo "ZRAM module file finally located at: $zram_path"
+            echo " ZRAM module file finally located at: $zram_path "
             mkdir -p "$(dirname "$target")"
             if [ "$(realpath "$zram_path")" != "$(realpath "$target")" ]; then
               cp "$zram_path" "$target"
@@ -695,7 +681,7 @@ jobs:
             echo "未找到 zram.ko 文件，构建可能失败"
             exit 1
           fi
- 
+
       - name: Upload ZRAM Module
         if: ${{ github.event.inputs.ZRAM == 'true' }}
         uses: actions/upload-artifact@v4
